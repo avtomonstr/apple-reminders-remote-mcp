@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 from starlette.applications import Starlette
-from starlette.routing import Mount
+from starlette.routing import Route
 
 import server.tools.reminders_lists
 import server.tools.reminders_subtasks
@@ -35,6 +35,13 @@ def create_asgi_app() -> Starlette:
         "SWIFT_BRIDGE_PATH", "./swift-bridge/.build/release/EventKitCLI"
     )
 
+    # Trigger lazy session manager creation, then grab the ASGI endpoint
+    mcp.streamable_http_app()
+    session_manager = mcp.session_manager
+    from mcp.server.fastmcp.server import StreamableHTTPASGIApp
+
+    mcp_endpoint = StreamableHTTPASGIApp(session_manager)
+
     @asynccontextmanager
     async def lifespan(app: Starlette) -> AsyncIterator[None]:
         bridge = SwiftBridge(binary_path=bridge_path)
@@ -50,14 +57,17 @@ def create_asgi_app() -> Starlette:
             set_bridge(None)
             bridge = None  # type: ignore[assignment]
         try:
-            yield
+            async with session_manager.run():
+                yield
         finally:
             if bridge:
                 await bridge.stop()
             set_bridge(None)
 
     app = Starlette(
-        routes=[Mount("/", app=mcp.streamable_http_app())],
+        routes=[
+            Route("/mcp", endpoint=mcp_endpoint, methods=["GET", "POST", "DELETE"]),
+        ],
         lifespan=lifespan,
     )
     app.add_middleware(BearerAuthMiddleware, token=token)
