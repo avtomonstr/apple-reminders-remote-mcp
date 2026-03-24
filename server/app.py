@@ -57,7 +57,7 @@ def create_asgi_app() -> Starlette:
             set_bridge(None)
 
     app = Starlette(
-        routes=[Mount("/mcp", app=mcp.streamable_http_app())],
+        routes=[Mount("/", app=mcp.streamable_http_app())],
         lifespan=lifespan,
     )
     app.add_middleware(BearerAuthMiddleware, token=token)
