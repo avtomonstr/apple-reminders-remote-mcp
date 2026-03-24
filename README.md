@@ -70,11 +70,13 @@ cp .env.example .env
 Edit `.env`:
 
 ```bash
-# Generate a strong random token (e.g., openssl rand -hex 32)
-REMINDERS_API_TOKEN=your-secret-token-here
+# Generate a strong random token
+REMINDERS_API_TOKEN=$(openssl rand -hex 32)
 HOST=127.0.0.1
 PORT=8000
 SWIFT_BRIDGE_PATH=./swift-bridge/.build/release/EventKitCLI
+# Your Cloudflare Tunnel hostname (required — without it, requests get 421)
+EXTERNAL_HOST=reminders.yourdomain.com
 ```
 
 ### 4. Test locally
@@ -134,7 +136,9 @@ Both start automatically on login with `KeepAlive` enabled. Logs go to `~/Librar
 
 ## Windows / Remote Client Setup
 
-### Option A: CLI
+### Claude Code (CLI)
+
+Native HTTP transport support — no proxy needed:
 
 ```bash
 claude mcp add --transport http apple-reminders https://reminders.yourdomain.com/mcp \
@@ -142,9 +146,7 @@ claude mcp add --transport http apple-reminders https://reminders.yourdomain.com
   --scope user
 ```
 
-### Option B: `.mcp.json`
-
-Create in your home directory or project root:
+Or add to `.mcp.json` in your home directory or project root:
 
 ```json
 {
@@ -155,6 +157,54 @@ Create in your home directory or project root:
       "headers": {
         "Authorization": "Bearer <your-token>"
       }
+    }
+  }
+}
+```
+
+### Claude Desktop
+
+Claude Desktop only supports stdio transport, so use
+[mcp-remote](https://www.npmjs.com/package/mcp-remote) as a proxy.
+Requires Node.js installed.
+
+Add to `claude_desktop_config.json`
+(`%APPDATA%\Claude\claude_desktop_config.json` on Windows,
+`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
+
+```json
+{
+  "mcpServers": {
+    "apple-reminders": {
+      "command": "cmd",
+      "args": [
+        "/C",
+        "npx",
+        "-y",
+        "mcp-remote",
+        "https://reminders.yourdomain.com/mcp",
+        "--header",
+        "Authorization: Bearer <your-token>"
+      ]
+    }
+  }
+}
+```
+
+On macOS / Linux, use `npx` directly instead of `cmd /C npx`:
+
+```json
+{
+  "mcpServers": {
+    "apple-reminders": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://reminders.yourdomain.com/mcp",
+        "--header",
+        "Authorization: Bearer <your-token>"
+      ]
     }
   }
 }
